@@ -53,3 +53,30 @@ class PatchManager(private val context: Context) {
         }
     }
 }
+
+class AppUpdateManager(private val context: Context) {
+    private val updateCheckUrl = "https://raw.githubusercontent.com/Ohkthx/xIPL/main/version.json"
+    
+    data class VersionInfo(val version: String, val downloadUrl: String)
+    
+    suspend fun checkForUpdates(): VersionInfo? {
+        val currentVersion = BuildConfig.VERSION_NAME
+        val remoteVersion = httpClient.get(updateCheckUrl).body<VersionInfo>()
+        
+        return if (remoteVersion.version > currentVersion) {
+            remoteVersion
+        } else null
+    }
+    
+    suspend fun downloadUpdate(versionInfo: VersionInfo) {
+        val workRequest = OneTimeWorkRequestBuilder<UpdateWorker>()
+            .setInputData(workDataOf("url" to versionInfo.downloadUrl))
+            .build()
+        
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "app_update",
+            ExistingWorkPolicy.KEEP,
+            workRequest
+        )
+    }
+}
